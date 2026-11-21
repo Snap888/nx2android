@@ -119,7 +119,10 @@ public final class MainActivity extends Activity {
             JSONObject game = games.optJSONObject(i);
             if (game == null) continue;
             String title = game.optString("title", "Unknown game");
-            if (!filter.isEmpty() && !title.toLowerCase(Locale.ROOT).contains(filter.toLowerCase(Locale.ROOT))) continue;
+            String state = game.optString("launch_state", "imported_unbuilt");
+            if ("__ready_only__".equals(filter) && !"ready".equals(state)) continue;
+            if ("__needs_build__".equals(filter) && "ready".equals(state)) continue;
+            if (!filter.isEmpty() && !filter.startsWith("__") && !title.toLowerCase(Locale.ROOT).contains(filter.toLowerCase(Locale.ROOT))) continue;
             if (col == 0) {
                 row = new LinearLayout(this);
                 row.setGravity(Gravity.TOP);
@@ -247,17 +250,30 @@ public final class MainActivity extends Activity {
 
     private void gameDetails(JSONObject game) {
         String id = game.optString("id");
-        String[] options = {"Настройки игры", "Открыть сведения", "Удалить ярлык"};
+        String[] options = {"Запустить игру", "Настройки игры", "Открыть сведения", "Удалить ярлык"};
         new AlertDialog.Builder(this).setTitle(game.optString("title"))
             .setItems(options, (d, which) -> {
-                if (which == 0) gameSettings(game);
-                else if (which == 1) new AlertDialog.Builder(this).setTitle("Сведения")
+                if (which == 0) launchGame(game);
+                else if (which == 1) gameSettings(game);
+                else if (which == 2) new AlertDialog.Builder(this).setTitle("Сведения")
                     .setMessage("ID: " + id + "\nПлатформа: " + game.optString("platform") +
                         "\nСтатус: " + statusLabel(game.optString("launch_state")) +
                         "\nИсточник: " + game.optString("source_uri", "—"))
                     .setPositiveButton("OK", null).show();
                 else confirmRemove(game);
             }).show();
+    }
+
+    private void launchGame(JSONObject game) {
+        if (!"ready".equals(game.optString("launch_state"))) {
+            new AlertDialog.Builder(this).setTitle("Игра пока не готова")
+                .setMessage("Для запуска необходим игровой payload и совместимый общий NGR runtime. Эта запись пока является только ярлыком/источником; запуск не имитируется.")
+                .setPositiveButton("Состояние runtime", (d,w) -> showBackendStatus()).setNegativeButton("Закрыть", null).show();
+            return;
+        }
+        new AlertDialog.Builder(this).setTitle("Runtime dispatcher")
+            .setMessage("Запуск будет доступен после подключения общего native runtime.")
+            .setPositiveButton("OK", null).show();
     }
 
     private void gameSettings(JSONObject game) {
