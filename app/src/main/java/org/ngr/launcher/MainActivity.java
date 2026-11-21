@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.BitmapFactory;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -17,7 +18,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.GridLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -30,6 +31,8 @@ import java.util.UUID;
 public final class MainActivity extends Activity {
     private static final int PICK_SOURCE = 1001;
     private static final int PICK_FOLDER = 1002;
+    private static final int PICK_COVER = 1003;
+    private JSONObject coverTarget;
     private static final int BG = Color.rgb(23, 22, 28);
     private static final int PANEL = Color.rgb(18, 18, 25);
     private static final int ACCENT = Color.rgb(39, 153, 235);
@@ -154,11 +157,22 @@ public final class MainActivity extends Activity {
         lp.setMargins(dp(3), dp(2), dp(7), dp(10));
         card.setLayoutParams(lp);
 
-        TextView cover = text(initials(game.optString("title", "NGR")), 27, Color.WHITE);
-        cover.setTypeface(Typeface.DEFAULT_BOLD);
-        cover.setGravity(Gravity.CENTER);
-        cover.setBackground(roundRect(Color.rgb(38, 53, 72), dp(10), 0, 0));
-        card.addView(cover, new LinearLayout.LayoutParams(-1, 0, 1));
+        String coverUri = game.optString("cover_uri", "");
+        if (!coverUri.isEmpty()) {
+            ImageView cover = new ImageView(this);
+            cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            try (java.io.InputStream in = getContentResolver().openInputStream(Uri.parse(coverUri))) {
+                if (in != null) cover.setImageBitmap(BitmapFactory.decodeStream(in));
+            } catch (Exception ignored) {}
+            cover.setBackground(roundRect(Color.rgb(38, 53, 72), dp(10), 0, 0));
+            card.addView(cover, new LinearLayout.LayoutParams(-1, 0, 1));
+        } else {
+            TextView cover = text(initials(game.optString("title", "NGR")), 27, Color.WHITE);
+            cover.setTypeface(Typeface.DEFAULT_BOLD);
+            cover.setGravity(Gravity.CENTER);
+            cover.setBackground(roundRect(Color.rgb(38, 53, 72), dp(10), 0, 0));
+            card.addView(cover, new LinearLayout.LayoutParams(-1, 0, 1));
+        }
         TextView name = text(game.optString("title", "Unknown game"), 13, Color.WHITE);
         name.setMaxLines(1);
         name.setGravity(Gravity.CENTER);
@@ -205,6 +219,14 @@ public final class MainActivity extends Activity {
         try { getContentResolver().takePersistableUriPermission(uri, flags); } catch (Exception ignored) {}
         if (requestCode == PICK_SOURCE) inspectSource(uri);
         else if (requestCode == PICK_FOLDER) registerImport(uri);
+        else if (requestCode == PICK_COVER && coverTarget != null) {
+            try {
+                coverTarget.put("cover_uri", uri.toString());
+                saveGame(coverTarget);
+                coverTarget = null;
+                renderCards();
+            } catch (JSONException e) { message("Не удалось сохранить обложку: " + e.getMessage()); }
+        }
     }
 
     private void inspectSource(Uri uri) {
@@ -289,18 +311,27 @@ public final class MainActivity extends Activity {
 
     private void gameDetails(JSONObject game) {
         String id = game.optString("id");
-        String[] options = {"Запустить игру", "Настройки игры", "Открыть сведения", "Удалить ярлык"};
+        String[] options = {"Запустить игру", "Настройки игры", "Изменить обложку", "Открыть сведения", "Удалить ярлык"};
         new AlertDialog.Builder(this).setTitle(game.optString("title"))
             .setItems(options, (d, which) -> {
                 if (which == 0) launchGame(game);
                 else if (which == 1) gameSettings(game);
-                else if (which == 2) new AlertDialog.Builder(this).setTitle("Сведения")
+                else if (which == 2) chooseCover(game);
+                else if (which == 3) new AlertDialog.Builder(this).setTitle("Сведения")
                     .setMessage("ID: " + id + "\nПлатформа: " + game.optString("platform") +
                         "\nСтатус: " + statusLabel(game.optString("launch_state")) +
                         "\nИсточник: " + game.optString("source_uri", "—"))
                     .setPositiveButton("OK", null).show();
                 else confirmRemove(game);
             }).show();
+    }
+
+    private void chooseCover(JSONObject game) {
+        coverTarget = game;
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.setType("image/*");
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(intent, PICK_COVER);
     }
 
     private void launchGame(JSONObject game) {
