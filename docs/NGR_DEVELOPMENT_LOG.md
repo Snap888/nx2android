@@ -23,11 +23,12 @@
 - [x] Define persistent catalog storage and initial versioned game manifest contract.
 - [x] Add CLI operations for listing, registering, updating settings, removing shortcuts and printing manifests.
 - [x] Add unit tests and a GitHub Actions workflow for the catalog layer (first run pending).
-- [ ] Choose and implement the Android launcher application/UI layer.
+- [x] Add a standalone Android application module with a dark 3-column game library, search/filter, folder import, per-game settings and a recompiler entry screen.
 - [ ] Prototype dynamic profile loading without breaking legacy APK builds.
 - [ ] Split runtime artifact from per-game payload.
 - [ ] Connect Add Game UI to the real recompiler pipeline.
-- [ ] Add CI and on-device acceptance tests.
+- [x] Add a dedicated GitHub Actions Android debug APK build workflow (first run pending).
+- [ ] Add on-device acceptance tests.
 
 ## Next actions
 
