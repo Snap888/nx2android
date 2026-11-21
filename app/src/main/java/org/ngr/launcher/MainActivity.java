@@ -8,6 +8,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.database.Cursor;
+import android.provider.OpenableColumns;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
@@ -171,11 +173,12 @@ public final class MainActivity extends Activity {
     }
 
     private void openRecompiler() {
-        String[] choices = {"Выбрать файл игры", "Поддерживаемые форматы", "Состояние рекомпилятора"};
+        String[] choices = {"Выбрать файл игры", "Очередь исходников", "Поддерживаемые форматы", "Состояние рекомпилятора"};
         new AlertDialog.Builder(this).setTitle("Добавить игру — рекомпилятор")
             .setItems(choices, (d, which) -> {
                 if (which == 0) chooseSource();
-                else if (which == 1) new AlertDialog.Builder(this).setTitle("Источники nx2android")
+                else if (which == 1) showPendingSources();
+                else if (which == 2) new AlertDialog.Builder(this).setTitle("Источники nx2android")
                     .setMessage("Nintendo Switch: NSP, XCI, NSZ, XCZ и папка игры с обновлениями/DLC.\n\nДругие платформы будут подключаться отдельными backend-модулями.")
                     .setPositiveButton("OK", null).show();
                 else showBackendStatus();
@@ -213,9 +216,23 @@ public final class MainActivity extends Activity {
             "\n\n" + (supported
             ? "Формат распознан. Следующий этап — передача источника в porter и сборка игрового payload."
             : "Формат пока не распознан. Выбери поддерживаемый источник.");
-        new AlertDialog.Builder(this).setTitle("Проверка игры").setMessage(msg)
-            .setPositiveButton("Понятно", (d, w) -> showBackendStatus())
-            .setNegativeButton("Отмена", null).show();
+        AlertDialog.Builder dialog = new AlertDialog.Builder(this).setTitle("Проверка игры").setMessage(msg);
+        if (supported) dialog.setPositiveButton("Сохранить источник", (d, w) -> {
+            try {
+                JSONArray pending = new JSONArray(getPreferences(0).getString("pending_sources", "[]"));
+                JSONObject item = new JSONObject();
+                item.put("id", UUID.randomUUID().toString());
+                item.put("name", name);
+                item.put("platform", platform);
+                item.put("uri", uri.toString());
+                item.put("state", "waiting_for_backend");
+                pending.put(item);
+                getPreferences(0).edit().putString("pending_sources", pending.toString()).apply();
+                showPendingSources();
+            } catch (JSONException e) { message("Не удалось сохранить источник: " + e.getMessage()); }
+        });
+        else dialog.setPositiveButton("Понятно", (d, w) -> showBackendStatus());
+        dialog.setNegativeButton("Отмена", null).show();
     }
 
     private void registerImport(Uri uri) {
@@ -240,6 +257,28 @@ public final class MainActivity extends Activity {
                 .setMessage("Папка сохранена как запись библиотеки. Для запуска ещё требуется сборка payload и подключение общего runtime.")
                 .setPositiveButton("OK", null).show();
         } catch (JSONException e) { message("Не удалось сохранить запись: " + e.getMessage()); }
+    }
+
+    private void showPendingSources() {
+        try {
+            JSONArray pending = new JSONArray(getPreferences(0).getString("pending_sources", "[]"));
+            if (pending.length() == 0) {
+                new AlertDialog.Builder(this).setTitle("Очередь рекомпилятора")
+                    .setMessage("Нет сохранённых исходников. Выбери файл игры через +.")
+                    .setPositiveButton("OK", null).show();
+                return;
+            }
+            StringBuilder lines = new StringBuilder();
+            for (int i = 0; i < pending.length(); i++) {
+                JSONObject item = pending.optJSONObject(i);
+                if (item != null) lines.append(item.optString("name")).append(" — ")
+                    .append(item.optString("platform")).append(" — ожидает backend\\n");
+            }
+            new AlertDialog.Builder(this).setTitle("Очередь исходников")
+                .setMessage(lines.toString() + "\\nСборка не запускается, пока Android backend не подключён.")
+                .setPositiveButton("Состояние backend", (d,w) -> showBackendStatus())
+                .setNegativeButton("Закрыть", null).show();
+        } catch (JSONException e) { message("Ошибка очереди: " + e.getMessage()); }
     }
 
     private void showBackendStatus() {
@@ -362,6 +401,20 @@ public final class MainActivity extends Activity {
 
     private void message(String s) { new AlertDialog.Builder(this).setMessage(s).setPositiveButton("OK", null).show(); }
     private String displayName(Uri uri) {
+        Cursor cursor = null;
+        try {
+            cursor = getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (index >= 0) {
+                    String name = cursor.getString(index);
+                    if (name != null && !name.trim().isEmpty()) return name;
+                }
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (cursor != null) cursor.close();
+        }
         String segment = uri.getLastPathSegment();
         if (segment == null || segment.isEmpty()) return "Imported game";
         int slash = segment.lastIndexOf('/');
