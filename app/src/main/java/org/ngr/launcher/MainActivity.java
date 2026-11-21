@@ -272,10 +272,10 @@ public final class MainActivity extends Activity {
             for (int i = 0; i < pending.length(); i++) {
                 JSONObject item = pending.optJSONObject(i);
                 if (item != null) lines.append(item.optString("name")).append(" — ")
-                    .append(item.optString("platform")).append(" — ожидает backend\\n");
+                    .append(item.optString("platform")).append(" — ожидает backend\n");
             }
             new AlertDialog.Builder(this).setTitle("Очередь исходников")
-                .setMessage(lines.toString() + "\\nСборка не запускается, пока Android backend не подключён.")
+                .setMessage(lines.toString() + "\nСборка не запускается, пока Android backend не подключён.")
                 .setPositiveButton("Состояние backend", (d,w) -> showBackendStatus())
                 .setNegativeButton("Закрыть", null).show();
         } catch (JSONException e) { message("Ошибка очереди: " + e.getMessage()); }
