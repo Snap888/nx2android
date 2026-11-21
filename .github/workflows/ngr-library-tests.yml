@@ -5,8 +5,10 @@ on:
     branches: [feature/ngr-universal-launcher]
     paths:
       - 'porter/library.py'
+      - 'porter/cli.py'
       - 'porter/paths.py'
       - 'tests/test_library.py'
+      - 'tests/test_library_cli.py'
       - '.github/workflows/ngr-library-tests.yml'
   pull_request:
     paths:
@@ -26,4 +28,4 @@ jobs:
       - name: Test persistent NGR library
         env:
           NX2A_HOME: ${{ runner.temp }}/ngr-home
-        run: python -m unittest discover -s tests -p 'test_library.py' -v
+        run: python -m unittest discover -s tests -p 'test_library*.py' -v
