@@ -87,6 +87,23 @@ def _parser():
     hs.add_argument('--package', default='', help='the app (default: the only ported game installed)')
     hs.add_argument('--device', default='', help='adb serial (default: the configured device, else the only one)')
     hs.add_argument('--jobs', type=int, default=os.cpu_count() or 8); hs.add_argument('--json', action='store_true')
+    # NGR's persistent library is separate from the legacy APK install list.
+    lb = sub.add_parser('library', help='manage the persistent NGR game library')
+    lbs = lb.add_subparsers(dest='library_cmd', required=True)
+    l_list = lbs.add_parser('list', help='list registered games'); l_list.add_argument('--json', action='store_true')
+    l_reg = lbs.add_parser('register', help='register an existing game payload as a library entry')
+    l_reg.add_argument('--title', required=True); l_reg.add_argument('--platform', required=True)
+    l_reg.add_argument('--payload', required=True, help='existing game payload folder or file')
+    l_reg.add_argument('--id', default='', help='stable library id (generated when omitted)')
+    l_reg.add_argument('--profile', default=''); l_reg.add_argument('--cover', default='')
+    l_reg.add_argument('--runtime', default='nx2android-legacy')
+    l_reg.add_argument('--source', default=''); l_reg.add_argument('--json', action='store_true')
+    l_rm = lbs.add_parser('remove', help='remove a library shortcut; never deletes game data')
+    l_rm.add_argument('id'); l_rm.add_argument('--json', action='store_true')
+    l_set = lbs.add_parser('settings', help='replace one game\'s per-game settings from a JSON object file')
+    l_set.add_argument('id'); l_set.add_argument('json_file'); l_set.add_argument('--json', action='store_true')
+    l_mf = lbs.add_parser('manifest', help='print a registered game\'s versioned launch manifest')
+    l_mf.add_argument('id'); l_mf.add_argument('--json', action='store_true')
     return ap
 
 
@@ -278,7 +295,41 @@ def cmd_driver(a):   # porter driver and porter host: the installed APK rebuilt 
     return 0
 
 
+
+def cmd_library(a):
+    from porter import library
+    try:
+        if a.library_cmd == 'list':
+            data = library.load()
+            out = data['games']
+        elif a.library_cmd == 'register':
+            out = library.register(a.title, a.platform, a.payload, game_id=a.id, profile_id=a.profile,
+                                   cover=a.cover, runtime=a.runtime, source=a.source)
+        elif a.library_cmd == 'remove':
+            out = library.remove(a.id)
+        elif a.library_cmd == 'settings':
+            settings = json.loads(Path(a.json_file).read_text(encoding='utf-8'))
+            out = library.update_settings(a.id, settings)
+        else:
+            data = library.load()
+            game = next((g for g in data['games'] if g['id'] == a.id), None)
+            if game is None: raise library.LibraryError(f'Game not found: {a.id}')
+            out = library.manifest(game)
+    except (library.LibraryError, OSError, json.JSONDecodeError) as e:
+        if getattr(a, 'json', False): _print_json({'error': str(e)})
+        else: print(f'NGR library: {e}', file=sys.stderr)
+        return 1
+    if getattr(a, 'json', False): _print_json(out)
+    elif a.library_cmd == 'list':
+        for g in out: print(f"{g['id']}\t{g['platform']}\t{g['title']}\t{g['launch_state']}")
+        if not out: print('NGR library is empty')
+    elif a.library_cmd == 'register': print(f"registered {out['title']} ({out['id']})")
+    elif a.library_cmd == 'remove': print(f"removed {out['id']} from library; payload kept")
+    elif a.library_cmd == 'settings': print(f"updated settings for {out['id']}")
+    else: print(json.dumps(out, ensure_ascii=False, indent=2))
+    return 0
+
 def main(argv):
     if hasattr(sys.stdout, 'reconfigure'): sys.stdout.reconfigure(encoding='utf-8', errors='replace')   # game names and progress bars on a Windows console
     a = _parser().parse_args(argv)
-    return {'doctor': cmd_doctor, 'profiles': cmd_profiles, 'inspect': cmd_inspect, 'port': cmd_port, 'install': cmd_install, 'devices': cmd_devices, 'tools': cmd_tools, 'config': cmd_config, 'saves': cmd_saves, 'driver': cmd_driver, 'host': cmd_driver}[a.cmd](a)
+    return {'doctor': cmd_doctor, 'profiles': cmd_profiles, 'inspect': cmd_inspect, 'port': cmd_port, 'install': cmd_install, 'devices': cmd_devices, 'tools': cmd_tools, 'config': cmd_config, 'saves': cmd_saves, 'driver': cmd_driver, 'host': cmd_driver, 'library': cmd_library}[a.cmd](a)
