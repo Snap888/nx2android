@@ -66,7 +66,9 @@ public final class MainActivity extends Activity {
     }
 
     private JSONArray readGames() {
-        return catalog().optJSONArray("games") == null ? new JSONArray() : catalog().optJSONArray("games");
+        JSONObject cat = catalog();
+        JSONArray items = cat.optJSONArray("games");
+        return items == null ? new JSONArray() : items;
     }
 
     private void render() {
@@ -120,6 +122,7 @@ public final class MainActivity extends Activity {
         cards.removeAllViews();
         LinearLayout row = null;
         int col = 0;
+        int visible = 0;
         for (int i = 0; i < games.length(); i++) {
             JSONObject game = games.optJSONObject(i);
             if (game == null) continue;
@@ -134,6 +137,7 @@ public final class MainActivity extends Activity {
                 cards.addView(row, new LinearLayout.LayoutParams(-1, -2));
             }
             row.addView(gameCard(game), new LinearLayout.LayoutParams(0, dp(178), 1));
+            visible++;
             col++;
             if (col == 3) col = 0;
         }
