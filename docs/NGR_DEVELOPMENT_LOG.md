@@ -20,8 +20,10 @@
 - [x] Document existing architecture constraints and target shared-runtime model.
 - [ ] Audit exact GUI files and port pipeline CLI/progress/cancellation APIs.
 - [ ] Audit generated game profile headers and all runtime consumers.
-- [ ] Choose Android launcher UI implementation and persistent catalog storage.
-- [ ] Define and test the versioned game manifest.
+- [x] Define persistent catalog storage and initial versioned game manifest contract.
+- [x] Add CLI operations for listing, registering, updating settings, removing shortcuts and printing manifests.
+- [x] Add unit tests and a GitHub Actions workflow for the catalog layer (first run pending).
+- [ ] Choose and implement the Android launcher application/UI layer.
 - [ ] Prototype dynamic profile loading without breaking legacy APK builds.
 - [ ] Split runtime artifact from per-game payload.
 - [ ] Connect Add Game UI to the real recompiler pipeline.
