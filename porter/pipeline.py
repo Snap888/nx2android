@@ -295,6 +295,7 @@ class Port:
 
     # ---- inputs: the folder's games and versions, the profile, the version to pack ----
     def inputs(self):
+        import hashlib  # keep the game-ID hash available even if a stale/alternate module loader omits module globals
         o = self.o
         say(f'game folder: {o.folder}')
         self.app, self.fam = nsp.scan_nsps(o.folder, dumps.EXTS, o.keys)
